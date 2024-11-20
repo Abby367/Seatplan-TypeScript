@@ -1,0 +1,82 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.seatPlan.project.dao.SeatDao">
+
+
+    <select id="getAllSeatModels" resultType="com.seatPlan.project.model.SeatModel"> SELECT ts.*,
+        CASE WHEN ts.seatstatus_id = 3 THEN 'Under' WHEN tu.is_deleted = 1 THEN 'UNOCCUPIED' ELSE
+        COALESCE(tu.first_name, 'UNOCCUPIED') END AS first_name, CASE WHEN ts.seatstatus_id = 3 THEN
+        'Repair' WHEN tu.is_deleted = 1 THEN '' ELSE CASE WHEN tu.is_machine = 1 THEN '' ELSE
+        COALESCE(tu.last_name, '') END END AS last_name, ta.area_name, CASE WHEN tu.is_machine = 1
+        THEN 'Machine' ELSE COALESCE(tpn.position_name, '') END AS position_name,
+        COALESCE(tp.project_id, 0) AS project_id, CASE WHEN tu.is_deleted = 1 THEN 'No Project' ELSE
+        COALESCE(tp.project_names, 'No Project') END AS project_name, COALESCE(tc.color_code,
+        '#FFFFFF') AS color_code FROM table_seat ts LEFT JOIN table_user tu ON ts.user_id =
+        tu.user_id LEFT JOIN table_area ta ON ts.area_id = ta.area_id LEFT JOIN ( SELECT u.user_id,
+        GROUP_CONCAT(pr.project_id) AS project_id, GROUP_CONCAT(pr.project_name SEPARATOR ', ') AS
+        project_names FROM table_user u LEFT JOIN table_userproject up ON u.user_id = up.user_id
+        LEFT JOIN table_project pr ON up.project_id = pr.project_id WHERE u.is_deleted = 0 GROUP BY
+        u.user_id ) tp ON tu.user_id = tp.user_id LEFT JOIN ( SELECT up.user_id, MIN(pr.color_id) AS
+        color_id FROM table_userproject up JOIN table_project pr ON up.project_id = pr.project_id
+        GROUP BY up.user_id ) tpc ON tu.user_id = tpc.user_id LEFT JOIN table_color tc ON
+        tpc.color_id = tc.color_id LEFT JOIN table_position tpn ON tu.position_id = tpn.position_id; </select>
+
+
+    <insert id="insertComment" parameterType="com.seatPlan.project.model.CommentInputModel"> INSERT
+        INTO table_comment ( user_id, seat_id, comment, created_by) VALUES ( #{user_id}, #{seat_id},
+        #{comment}, #{created_by}) </insert>
+
+    <select id="getCommentByUserId" resultType="com.seatPlan.project.model.CommentModel"> SELECT
+        c.*, u.first_name, u.last_name FROM table_comment c JOIN table_user u ON c.user_id =
+        u.user_id WHERE (c.user_id = #{user_id} OR recipient_id = #{user_id}) AND seat_id =
+        #{seat_id} ORDER BY c.created_time DESC </select>
+
+
+    <select id="getAllComment" resultType="com.seatPlan.project.model.CommentModel"> SELECT c.*,
+        u.first_name, u.last_name FROM table_comment c JOIN table_user u ON c.user_id = u.user_id
+        ORDER BY c.created_time DESC </select>
+
+    <update id="swapSeat" parameterType="com.seatPlan.project.model.SeatModel"> UPDATE table_seat <set>
+            <if test="user_id != null">user_id = #{user_id},</if>
+            <if test="updated_by != null">updated_by
+        = #{updated_by},</if>
+        </set> WHERE seat_id = #{seat_id} </update>
+
+
+    <update id="updateSeat" parameterType="com.seatPlan.project.model.SeatModel"> UPDATE table_seat <set>
+            <if test="user_id != null"> user_id = #{user_id}, seatstatus_id = 2, </if>
+            <if
+                test="updated_by != null">updated_by = #{updated_by},</if>
+        </set> WHERE
+        seat_id = #{seat_id} </update>
+
+
+    <select id="getSeatById" resultType="com.seatPlan.project.model.SeatModel"> SELECT seat_id FROM
+        table_seat WHERE seat_id = #{seat_id} AND is_deleted = 0 </select>
+
+
+    <select id="getAllUser" resultType="com.seatPlan.project.model.UserModel"> SELECT user_id,
+        first_name, last_name FROM table_user WHERE is_deleted = 0 AND NOT EXISTS ( SELECT 1 FROM
+        table_seat WHERE table_seat.user_id = table_user.user_id ) </select>
+
+    <update id="swapUserIds" parameterType="com.seatPlan.project.model.SeatModel"> UPDATE table_seat <set>
+            <if test="seatId1 != null and seatId2 != null"> user_id = CASE seat_id WHEN #{seatId1}
+        THEN (SELECT user_id FROM table_seat WHERE seat_id = #{seatId2}) WHEN #{seatId2} THEN
+        (SELECT user_id FROM table_seat WHERE seat_id = #{seatId1}) ELSE user_id END, </if>
+        updated_by = #{updated_by}, </set> WHERE seat_id IN (#{seatId1}, #{seatId2}) </update>
+
+
+    <select id="getCommentByChatId"> SELECT c.*, u.first_name, u.last_name FROM table_comment c JOIN
+        table_user u ON c.user_id = u.user_id WHERE (c.user_id = #{user_id} OR recipient_id =
+        #{recipient_id}) AND seat_id = #{seat_id} ORDER BY c.created_time ASC </select>
+
+    <select id="isUserAlreadyAssigned" resultType="boolean"> SELECT COUNT(user_id) FROM table_seat
+        WHERE user_id = #{user_id} </select>
+
+
+    <select id="getCommentByUserIdOnly" resultType="com.seatPlan.project.model.CommentModel"> SELECT
+        c.*, u.first_name, u.last_name FROM table_comment c JOIN table_user u ON c.user_id =
+        u.user_id WHERE (c.user_id = #{user_id} OR recipient_id = #{user_id}) ORDER BY
+        c.created_time DESC </select>
+
+
+</mapper>
